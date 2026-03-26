@@ -446,6 +446,7 @@ function App(){
   const [trackers,setTrackers]=useState(()=>load("app_trackers",TRACKERS_DEFAULT));
   const [activeId,setActiveId]=useState("homework");
   const [showNewTracker,setShowNewTracker]=useState(false);
+  const [sidebarOpen,setSidebarOpen]=useState(true);
   const active=trackers.find(t=>t.id===activeId)||trackers[0];
 
   useEffect(()=>{
@@ -470,10 +471,10 @@ function App(){
   };
 
   return(
-    <div style={{display:"flex",height:"100vh",overflow:"hidden"}}>
+    <div style={{display:"flex",height:"100vh",overflow:"hidden",position:"relative"}}>
       {showNewTracker&&<NewTrackerModal onClose={()=>setShowNewTracker(false)} onSave={addTracker}/>}
 
-      <div style={{width:230,background:`linear-gradient(180deg,${ROYAL} 0%,#1e2d6b 100%)`,display:"flex",flexDirection:"column",flexShrink:0}}>
+      <div style={{width:sidebarOpen?230:0,minWidth:0,background:`linear-gradient(180deg,${ROYAL} 0%,#1e2d6b 100%)`,display:"flex",flexDirection:"column",flexShrink:0,overflow:"hidden",transition:"width 0.25s cubic-bezier(.4,0,.2,1)"}}>
         <div style={{padding:"22px 20px 18px",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -520,7 +521,12 @@ function App(){
         </div>
       </div>
 
-      <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+      <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",position:"relative"}}>
+        <button onClick={()=>setSidebarOpen(o=>!o)} style={{position:"absolute",top:18,left:16,zIndex:50,width:32,height:32,borderRadius:8,background:"#EEF0FF",border:"1.5px solid #C7D2FE",display:"flex",alignItems:"center",justifyContent:"center",color:ACCENT,transition:"all 0.15s"}} title={sidebarOpen?"Hide sidebar":"Show sidebar"}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {sidebarOpen?<><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>:<><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>}
+          </svg>
+        </button>
         <Tracker
           key={active.id}
           storageKey={active.storageKey}
