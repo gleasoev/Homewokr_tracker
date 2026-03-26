@@ -22,7 +22,7 @@
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
+<script type="text/babel" data-presets="react">
 const {useState,useMemo,useEffect}=React;
 
 const ACCENT="#3B4FD8";
@@ -382,7 +382,7 @@ const TRACKERS=[
   {id:"personal",label:"Personal",icon:"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",storageKey:"personal",sampleData:P_SAMPLE,defaultGroups:DEFAULT_PERSONAL_CATS,typeList:PERSONAL_TYPES,typeCMap:P_TYPE_C,name:"Personal tracker"},
 ];
 
-export default function App(){
+function App(){
   const [activeId,setActiveId]=useState("homework");
   const active=TRACKERS.find(t=>t.id===activeId);
 
