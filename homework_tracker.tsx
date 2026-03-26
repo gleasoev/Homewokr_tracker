@@ -1,0 +1,353 @@
+import { useState, useMemo } from "react";
+
+const PRIORITIES = ["High", "Medium", "Low"];
+const TYPES = ["Assignment", "Test", "Quiz", "Lab", "Project", "Other"];
+const STATUSES = ["Not Started", "In Progress", "Done"];
+const DEFAULT_COURSES = ["CIS 350", "CIS 375", "GPY 235", "CIS 290", "Other"];
+
+const ACCENT = "#6C63FF";
+const ACCENT_LIGHT = "#EEF0FF";
+const ACCENT_MID = "#C5C2FF";
+
+const PRI = {
+  High:   { bg: "#FFF0F0", text: "#C0392B", dot: "#E74C3C", border: "#FACACA" },
+  Medium: { bg: "#FFF8EC", text: "#B7680A", dot: "#F39C12", border: "#FCDFA0" },
+  Low:    { bg: "#F0FFF4", text: "#1E7E34", dot: "#27AE60", border: "#A8DFB8" },
+};
+const TYPE_C = {
+  Test:       { bg: "#FFF0F8", text: "#8E1E6E", border: "#F0B8DE" },
+  Quiz:       { bg: "#F3F0FF", text: "#4B35B5", border: "#C8BEFF" },
+  Assignment: { bg: "#EEF5FF", text: "#1A5FA8", border: "#AECEF5" },
+  Lab:        { bg: "#EDFFF8", text: "#0A6E52", border: "#8FD9C0" },
+  Project:    { bg: "#FFF4EE", text: "#8C3A10", border: "#F5BEA0" },
+  Other:      { bg: "#F5F5F7", text: "#555", border: "#DDDDE0" },
+};
+const STATUS_META = {
+  "Not Started": { dot: "#CBD5E1", label: "Not started", bg: "#F8FAFC" },
+  "In Progress":  { dot: ACCENT,    label: "In progress",  bg: ACCENT_LIGHT },
+  "Done":         { dot: "#22C55E", label: "Done",          bg: "#F0FDF4" },
+};
+
+const initialTasks = [
+  { id: 1, title: "VLAN Diagram", course: "CIS 375", type: "Assignment", due: "2026-03-27", priority: "High", status: "In Progress", notes: "draw.io submission — must include all VLANs and trunk links" },
+  { id: 2, title: "Midterm Exam", course: "CIS 350", type: "Test", due: "2026-04-02", priority: "High", status: "Not Started", notes: "UML diagrams, CPM, WBS — review all lab exercises" },
+  { id: 3, title: "Wireless Security Lab", course: "CIS 375", type: "Lab", due: "2026-03-25", priority: "Medium", status: "In Progress", notes: "Kismet + airodump-ng writeup" },
+  { id: 4, title: "Geography Map", course: "GPY 235", type: "Assignment", due: "2026-04-05", priority: "Low", status: "Not Started", notes: "" },
+];
+
+function daysLeft(due) {
+  return Math.ceil((new Date(due) - new Date()) / 86400000);
+}
+
+function DuePill({ due }) {
+  const d = daysLeft(due);
+  let bg, color, label;
+  if (d < 0)        { bg = "#FFF0F0"; color = "#C0392B"; label = "Overdue"; }
+  else if (d === 0) { bg = "#FFF8EC"; color = "#B7680A"; label = "Due today"; }
+  else if (d <= 2)  { bg = "#FFF8EC"; color = "#B7680A"; label = `${d}d left`; }
+  else              { bg = "#F0FFF4"; color = "#1E7E34"; label = `${d}d`; }
+  return (
+    <span style={{ background: bg, color, fontSize: 10, fontWeight: 600, padding: "3px 9px", borderRadius: 99, whiteSpace: "nowrap", letterSpacing: "0.02em" }}>{label}</span>
+  );
+}
+
+function Avatar({ name }) {
+  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div style={{ width: 32, height: 32, borderRadius: "50%", background: ACCENT_LIGHT, color: ACCENT, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1.5px solid ${ACCENT_MID}` }}>{initials}</div>
+  );
+}
+
+function CheckCircle({ status, onClick }) {
+  const m = STATUS_META[status];
+  const done = status === "Done";
+  const inP  = status === "In Progress";
+  return (
+    <div onClick={e => { e.stopPropagation(); onClick(); }}
+      style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${m.dot}`, background: done ? m.dot : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+      {done && <svg width="11" height="9" viewBox="0 0 11 9"><polyline points="1,4.5 4,7.5 10,1" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+      {inP  && <div style={{ width: 9, height: 9, borderRadius: "50%", background: m.dot }}/>}
+    </div>
+  );
+}
+
+function Modal({ task, onClose, onSave, courses, onAddCourse }) {
+  const blank = { title: "", course: courses[0], type: "Assignment", due: "", priority: "Medium", status: "Not Started", notes: "" };
+  const [form, setForm] = useState(task || blank);
+  const [newC, setNewC] = useState("");
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const labelStyle = { fontSize: 11, fontWeight: 600, color: "#94A3B8", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.06em", display: "block" };
+  const inputStyle = { width: "100%", boxSizing: "border-box", fontSize: 13, borderRadius: 10, border: "1.5px solid #E2E8F0", padding: "9px 12px", outline: "none", fontFamily: "inherit", color: "#1E293B", background: "#FAFBFC" };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,20,40,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #E8EAF0", padding: "1.75rem", width: 460, maxWidth: "96vw", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 17, color: "#1E293B" }}>{task?.id ? "Edit task" : "Add new task"}</div>
+            <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Fill in the details below</div>
+          </div>
+          <button onClick={onClose} style={{ background: "#F1F5F9", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", fontSize: 16, color: "#64748B", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={labelStyle}>Task title</label>
+            <input placeholder="e.g. Chapter 5 lab report" value={form.title} onChange={e => set("title", e.target.value)} style={inputStyle} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {[["course", "Course", courses], ["type", "Type", TYPES], ["priority", "Priority", PRIORITIES], ["status", "Status", STATUSES]].map(([key, lbl, opts]) => (
+              <div key={key}>
+                <label style={labelStyle}>{lbl}</label>
+                <select value={form[key]} onChange={e => set(key, e.target.value)} style={{ ...inputStyle, appearance: "none", cursor: "pointer" }}>
+                  {opts.map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          <div>
+            <label style={labelStyle}>Due date</label>
+            <input type="date" value={form.due} onChange={e => set("due", e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Notes</label>
+            <textarea placeholder="Any additional notes..." value={form.notes} onChange={e => set("notes", e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input value={newC} onChange={e => setNewC(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && newC.trim()) { onAddCourse(newC.trim()); set("course", newC.trim()); setNewC(""); }}} placeholder="Add new course..." style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
+            <button onClick={() => { if (newC.trim()) { onAddCourse(newC.trim()); set("course", newC.trim()); setNewC(""); }}} style={{ padding: "9px 14px", fontSize: 12, background: ACCENT_LIGHT, color: ACCENT, border: `1.5px solid ${ACCENT_MID}`, borderRadius: 10, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>+ Add</button>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "9px 18px", fontSize: 13, background: "#F1F5F9", border: "1.5px solid #E2E8F0", borderRadius: 10, cursor: "pointer", color: "#64748B", fontWeight: 500 }}>Cancel</button>
+          <button onClick={() => { if (form.title && form.due) onSave(form); }} style={{ padding: "9px 22px", fontSize: 13, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600, letterSpacing: "0.01em" }}>
+            {task?.id ? "Save changes" : "Add task"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [tasks, setTasks] = useState(initialTasks);
+  const [modal, setModal] = useState(null);
+  const [courses, setCourses] = useState(DEFAULT_COURSES);
+  const [nextId, setNextId] = useState(300);
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterCourse, setFilterCourse] = useState("All");
+  const [view, setView] = useState("list");
+  const [expanded, setExpanded] = useState(null);
+  const [sort, setSort] = useState("due");
+
+  const allCourses = useMemo(() => [...new Set([...courses, ...tasks.map(t => t.course)])], [courses, tasks]);
+  const saveTask = f => { if (f.id) setTasks(ts => ts.map(t => t.id === f.id ? f : t)); else { setTasks(ts => [...ts, { ...f, id: nextId }]); setNextId(n => n + 1); } setModal(null); };
+  const cycleStatus = id => setTasks(ts => ts.map(t => t.id === id ? { ...t, status: STATUSES[(STATUSES.indexOf(t.status) + 1) % 3] } : t));
+  const deleteTask = id => setTasks(ts => ts.filter(t => t.id !== id));
+  const addCourse = c => { if (!allCourses.includes(c)) setCourses(cs => [...cs, c]); };
+
+  const filtered = useMemo(() => {
+    let t = [...tasks];
+    if (filterStatus !== "All") t = t.filter(x => x.status === filterStatus);
+    if (filterCourse !== "All") t = t.filter(x => x.course === filterCourse);
+    if (sort === "due") t.sort((a, b) => new Date(a.due) - new Date(b.due));
+    else if (sort === "priority") t.sort((a, b) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority));
+    else t.sort((a, b) => a.course.localeCompare(b.course));
+    return t;
+  }, [tasks, filterStatus, filterCourse, sort]);
+
+  const grouped = useMemo(() => { const g = {}; filtered.forEach(t => { if (!g[t.course]) g[t.course] = []; g[t.course].push(t); }); return g; }, [filtered]);
+
+  const stats = useMemo(() => ({
+    total: tasks.length,
+    done: tasks.filter(t => t.status === "Done").length,
+    inProg: tasks.filter(t => t.status === "In Progress").length,
+    overdue: tasks.filter(t => t.status !== "Done" && daysLeft(t.due) < 0).length,
+  }), [tasks]);
+
+  const pct = stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
+
+  const selectStyle = { fontSize: 12, padding: "7px 12px", borderRadius: 10, border: "1.5px solid #E2E8F0", background: "#FAFBFC", color: "#334155", cursor: "pointer", outline: "none", fontFamily: "inherit" };
+
+  const statCards = [
+    { label: "Total tasks", value: stats.total, icon: "M4 6h16M4 10h16M4 14h8", color: "#334155", iconColor: "#94A3B8" },
+    { label: "In progress", value: stats.inProg, icon: "M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4", color: ACCENT, iconColor: ACCENT },
+    { label: "Completed", value: `${pct}%`, icon: "M20 6L9 17l-5-5", color: "#16A34A", iconColor: "#16A34A" },
+    { label: "Overdue", value: stats.overdue, icon: "M12 8v4l3 3M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z", color: stats.overdue > 0 ? "#C0392B" : "#94A3B8", iconColor: stats.overdue > 0 ? "#E74C3C" : "#CBD5E1" },
+  ];
+
+  return (
+    <div style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", padding: "1.5rem 0", minHeight: 500, color: "#1E293B" }}>
+      {modal !== null && <Modal task={modal === "new" ? null : modal} onClose={() => setModal(null)} onSave={saveTask} courses={allCourses} onAddCourse={addCourse} />}
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 19, fontWeight: 700, color: "#0F172A", letterSpacing: "-0.02em" }}>Coursework tracker</div>
+            <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 1 }}>Spring 2026 · GVSU</div>
+          </div>
+        </div>
+        <button onClick={() => setModal("new")} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 18px", fontSize: 13, fontWeight: 600, background: ACCENT, color: "#fff", border: "none", borderRadius: 11, cursor: "pointer", letterSpacing: "0.01em" }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="7" y1="1" x2="7" y2="13" stroke="white" strokeWidth="2" strokeLinecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>
+          New task
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12, marginBottom: 20 }}>
+        {statCards.map(s => (
+          <div key={s.label} style={{ background: "#fff", border: "1.5px solid #F1F5F9", borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</span>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: s.iconColor + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={s.iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={s.icon}/></svg>
+              </div>
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: s.color, letterSpacing: "-0.03em", lineHeight: 1 }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: "#F8FAFC", borderRadius: 99, height: 6, marginBottom: 22, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${ACCENT}, #22C55E)`, borderRadius: 99, transition: "width 0.5s cubic-bezier(.4,0,.2,1)" }}/>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", background: "#F1F5F9", borderRadius: 10, padding: 3, gap: 2 }}>
+          {["list", "board"].map(v => (
+            <button key={v} onClick={() => setView(v)} style={{ padding: "6px 16px", fontSize: 12, border: "none", borderRadius: 8, background: view === v ? "#fff" : "transparent", color: view === v ? "#1E293B" : "#94A3B8", fontWeight: view === v ? 600 : 400, cursor: "pointer", boxShadow: view === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s" }}>
+              {v === "list" ? "List" : "Board"}
+            </button>
+          ))}
+        </div>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={selectStyle}>
+          <option value="All">All statuses</option>
+          {STATUSES.map(s => <option key={s}>{s}</option>)}
+        </select>
+        <select value={filterCourse} onChange={e => setFilterCourse(e.target.value)} style={selectStyle}>
+          <option value="All">All courses</option>
+          {allCourses.map(c => <option key={c}>{c}</option>)}
+        </select>
+        <select value={sort} onChange={e => setSort(e.target.value)} style={selectStyle}>
+          <option value="due">Sort: due date</option>
+          <option value="priority">Sort: priority</option>
+          <option value="course">Sort: course</option>
+        </select>
+      </div>
+
+      {view === "list" && (
+        <div style={{ background: "#fff", border: "1.5px solid #F1F5F9", borderRadius: 16, overflow: "hidden" }}>
+          {Object.keys(grouped).length === 0 && (
+            <div style={{ padding: "3rem", textAlign: "center", color: "#CBD5E1", fontSize: 13 }}>No tasks found — add one above.</div>
+          )}
+          {Object.entries(grouped).map(([course, ctasks], gi) => (
+            <div key={course}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 18px", background: "#F8FAFC", borderTop: gi > 0 ? "1.5px solid #F1F5F9" : "none", borderBottom: "1.5px solid #F1F5F9" }}>
+                <Avatar name={course} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>{course}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 99, padding: "1px 9px" }}>{ctasks.length}</span>
+              </div>
+              {ctasks.map((task, ti) => {
+                const tc = TYPE_C[task.type] || TYPE_C.Other;
+                const pc = PRI[task.priority];
+                const exp = expanded === task.id;
+                const done = task.status === "Done";
+                return (
+                  <div key={task.id} style={{ borderBottom: ti < ctasks.length - 1 ? "1px solid #F8FAFC" : "none" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", cursor: "pointer", transition: "background 0.1s" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#FAFBFF"}
+                      onMouseLeave={e => e.currentTarget.style.background = ""}
+                      onClick={() => setExpanded(exp ? null : task.id)}>
+                      <CheckCircle status={task.status} onClick={() => cycleStatus(task.id)} />
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: done ? "#CBD5E1" : "#1E293B", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, flexShrink: 0 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, background: tc.bg, color: tc.text, border: `1px solid ${tc.border}`, padding: "3px 9px", borderRadius: 99 }}>{task.type}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, background: pc.bg, color: pc.text, border: `1px solid ${pc.border}`, padding: "3px 9px", borderRadius: 99, display: "flex", alignItems: "center", gap: 4 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: pc.dot }}/>
+                          {task.priority}
+                        </span>
+                        {task.due && <DuePill due={task.due} />}
+                        <span style={{ fontSize: 11, color: "#94A3B8", minWidth: 52, textAlign: "right" }}>
+                          {task.due ? new Date(task.due + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—"}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: 5 }} onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setModal(task)} style={{ padding: "4px 11px", fontSize: 11, fontWeight: 600, background: "#F8FAFC", border: "1.5px solid #E2E8F0", borderRadius: 8, cursor: "pointer", color: "#64748B" }}>Edit</button>
+                        <button onClick={() => deleteTask(task.id)} style={{ padding: "4px 10px", fontSize: 11, fontWeight: 600, background: "#FFF0F0", border: "1.5px solid #FACACA", borderRadius: 8, cursor: "pointer", color: "#C0392B" }}>✕</button>
+                      </div>
+                    </div>
+                    {exp && (
+                      <div style={{ padding: "0 18px 14px 52px", borderTop: "1px solid #F8FAFC" }}>
+                        {task.notes && <div style={{ fontSize: 12, color: "#64748B", marginBottom: 8, lineHeight: 1.6 }}>{task.notes}</div>}
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, color: STATUS_META[task.status].dot === "#CBD5E1" ? "#94A3B8" : STATUS_META[task.status].dot, background: STATUS_META[task.status].bg, padding: "3px 10px", borderRadius: 99 }}>
+                          <div style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_META[task.status].dot }}/>
+                          {STATUS_META[task.status].label}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "board" && (
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", overflowX: "auto", paddingBottom: 10 }}>
+          {STATUSES.map(status => {
+            const col = filtered.filter(t => t.status === status);
+            const sm = STATUS_META[status];
+            return (
+              <div key={status} style={{ flex: "0 0 270px", background: "#F8FAFC", borderRadius: 16, border: "1.5px solid #F1F5F9", overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px", borderBottom: "1.5px solid #F1F5F9" }}>
+                  <div style={{ width: 9, height: 9, borderRadius: "50%", background: sm.dot }}/>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>{status}</span>
+                  <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "#94A3B8", background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 99, padding: "1px 8px" }}>{col.length}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12 }}>
+                  {col.length === 0 && <div style={{ fontSize: 12, color: "#CBD5E1", textAlign: "center", padding: "1.5rem 0" }}>Nothing here</div>}
+                  {col.map(task => {
+                    const tc = TYPE_C[task.type] || TYPE_C.Other;
+                    const pc = PRI[task.priority];
+                    return (
+                      <div key={task.id} style={{ background: "#fff", border: "1.5px solid #F1F5F9", borderRadius: 12, padding: "13px 14px", transition: "border-color 0.15s" }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = ACCENT_MID}
+                        onMouseLeave={e => e.currentTarget.style.borderColor = "#F1F5F9"}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#1E293B", lineHeight: 1.4 }}>{task.title}</span>
+                          <button onClick={() => setModal(task)} style={{ padding: "2px 8px", fontSize: 12, background: "#F8FAFC", border: "1.5px solid #E2E8F0", borderRadius: 7, cursor: "pointer", color: "#94A3B8", flexShrink: 0 }}>···</button>
+                        </div>
+                        <div style={{ fontSize: 11, color: "#94A3B8", marginBottom: 10, fontWeight: 500 }}>{task.course}</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, background: tc.bg, color: tc.text, border: `1px solid ${tc.border}`, padding: "2px 8px", borderRadius: 99 }}>{task.type}</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, background: pc.bg, color: pc.text, border: `1px solid ${pc.border}`, padding: "2px 8px", borderRadius: 99 }}>{task.priority}</span>
+                          {task.due && <DuePill due={task.due} />}
+                        </div>
+                        {task.due && (
+                          <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #F8FAFC", fontSize: 11, color: "#94A3B8", fontWeight: 500 }}>
+                            {new Date(task.due + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ marginTop: 16, display: "flex", gap: 16, alignItems: "center" }}>
+        <div style={{ fontSize: 11, color: "#CBD5E1", display: "flex", gap: 14 }}>
+          <span>Click circle to cycle status</span>
+          <span>·</span>
+          <span>Click row to expand</span>
+        </div>
+      </div>
+    </div>
+  );
+}
