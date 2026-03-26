@@ -3,18 +3,19 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Coursework Tracker</title>
+<title>Tracker</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F0F4FF;color:#1E293B;min-height:100vh}
+  html,body,#root{height:100%}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F0F4FF;color:#1E293B;overflow:hidden}
   input,select,textarea{font-family:inherit;font-size:13px;border:1.5px solid #C7D2FE;border-radius:10px;padding:9px 12px;outline:none;background:#F8FAFF;color:#1E293B;width:100%;transition:border-color 0.15s}
   input:focus,select:focus,textarea:focus{border-color:#3B4FD8}
   button{font-family:inherit;cursor:pointer;transition:opacity 0.15s,transform 0.1s}
   button:active{transform:scale(0.97)}
-  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar{width:5px;height:5px}
   ::-webkit-scrollbar-track{background:transparent}
   ::-webkit-scrollbar-thumb{background:#C7D2FE;border-radius:99px}
 </style>
@@ -24,27 +25,38 @@
 <script type="text/babel">
 const {useState,useMemo,useEffect}=React;
 
-const PRIORITIES=["High","Medium","Low"];
-const TYPES=["Assignment","Test","Quiz","Lab","Project","Other"];
-const STATUSES=["Not Started","In Progress","Done"];
-const DEFAULT_COURSES=["CIS 350","CIS 375","GPY 235","CIS 290","Other"];
-
 const ACCENT="#3B4FD8";
 const ACCENT_LIGHT="#EEF0FF";
 const ACCENT_MID="#A5B4FC";
 const ROYAL="#1E3A8A";
+
+const PRIORITIES=["High","Medium","Low"];
+const TYPES=["Assignment","Test","Quiz","Lab","Project","Other"];
+const STATUSES=["Not Started","In Progress","Done"];
+const PERSONAL_TYPES=["Task","Goal","Errand","Health","Finance","Social","Other"];
+const DEFAULT_HW_COURSES=["CIS 350","CIS 375","GPY 235","CIS 290","Other"];
+const DEFAULT_PERSONAL_CATS=["Personal","Home","Health","Finance","Social","Other"];
 
 const PRI={
   High:{bg:"#FFF0F0",text:"#C0392B",dot:"#E74C3C",border:"#FACACA"},
   Medium:{bg:"#FFF8EC",text:"#B7680A",dot:"#F39C12",border:"#FCDFA0"},
   Low:{bg:"#EFF6FF",text:"#1D4ED8",dot:"#3B82F6",border:"#BFDBFE"},
 };
-const TYPE_C={
+const HW_TYPE_C={
   Test:{bg:"#EDE9FE",text:"#4C1D95",border:"#C4B5FD"},
   Quiz:{bg:"#EFF6FF",text:"#1E40AF",border:"#BFDBFE"},
   Assignment:{bg:"#EEF2FF",text:"#3730A3",border:"#A5B4FC"},
   Lab:{bg:"#F0F9FF",text:"#075985",border:"#7DD3FC"},
   Project:{bg:"#F5F3FF",text:"#5B21B6",border:"#DDD6FE"},
+  Other:{bg:"#F1F5F9",text:"#475569",border:"#CBD5E1"},
+};
+const P_TYPE_C={
+  Task:{bg:"#EEF2FF",text:"#3730A3",border:"#A5B4FC"},
+  Goal:{bg:"#EDE9FE",text:"#4C1D95",border:"#C4B5FD"},
+  Errand:{bg:"#FFF8EC",text:"#B7680A",border:"#FCDFA0"},
+  Health:{bg:"#EDFFF8",text:"#0A6E52",border:"#8FD9C0"},
+  Finance:{bg:"#F0FFF4",text:"#1E7E34",border:"#A8DFB8"},
+  Social:{bg:"#FFF0F8",text:"#8E1E6E",border:"#F0B8DE"},
   Other:{bg:"#F1F5F9",text:"#475569",border:"#CBD5E1"},
 };
 const STATUS_META={
@@ -53,15 +65,20 @@ const STATUS_META={
   "Done":{dot:"#16A34A",label:"Done",bg:"#F0FDF4",text:"#15803D"},
 };
 
-const SAMPLE=[
+const HW_SAMPLE=[
   {id:1,title:"VLAN Diagram",course:"CIS 375",type:"Assignment",due:"2026-03-27",priority:"High",status:"In Progress",notes:"draw.io submission — include all VLANs and trunk links"},
-  {id:2,title:"Midterm Exam",course:"CIS 350",type:"Test",due:"2026-04-02",priority:"High",status:"Not Started",notes:"UML diagrams, CPM, WBS — review all lab exercises"},
+  {id:2,title:"Midterm Exam",course:"CIS 350",type:"Test",due:"2026-04-02",priority:"High",status:"Not Started",notes:"UML diagrams, CPM, WBS"},
   {id:3,title:"Wireless Security Lab",course:"CIS 375",type:"Lab",due:"2026-03-25",priority:"Medium",status:"In Progress",notes:"Kismet + airodump-ng writeup"},
   {id:4,title:"Geography Map",course:"GPY 235",type:"Assignment",due:"2026-04-05",priority:"Low",status:"Not Started",notes:""},
 ];
+const P_SAMPLE=[
+  {id:101,title:"Apply for Student Dev Pack",course:"Personal",type:"Goal",due:"2026-04-01",priority:"High",status:"Not Started",notes:"Use GVSU email at education.github.com/pack"},
+  {id:102,title:"Set up VS Code + Git",course:"Home",type:"Task",due:"2026-03-28",priority:"Medium",status:"In Progress",notes:"Clone repo, install extensions"},
+  {id:103,title:"Grocery run",course:"Personal",type:"Errand",due:"2026-03-27",priority:"Low",status:"Not Started",notes:""},
+];
 
-function load(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback;}catch{return fallback;}}
-function save(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch{}}
+function load(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
 function daysLeft(due){return Math.ceil((new Date(due)-new Date())/86400000);}
 
 function DuePill({due}){
@@ -69,18 +86,17 @@ function DuePill({due}){
   let bg,color,label;
   if(d<0){bg="#FFF0F0";color="#C0392B";label="Overdue";}
   else if(d===0){bg="#FFF8EC";color="#B7680A";label="Today";}
-  else if(d<=2){bg="#FFF8EC";color="#B7680A";label:`${d}d`;}
-  else{bg:"#EFF6FF";color="#1D4ED8";label=`${d}d`;}
-  return <span style={{background:bg,color,fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:99,whiteSpace:"nowrap",letterSpacing:"0.03em"}}>{label}</span>;
+  else if(d<=2){bg="#FFF8EC";color="#B7680A";label=d+"d";}
+  else{bg="#EFF6FF";color="#1D4ED8";label=d+"d";}
+  return <span style={{background:bg,color,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,whiteSpace:"nowrap"}}>{label}</span>;
 }
 
 function StatusPill({status}){
   const m=STATUS_META[status];
-  const short={"Not Started":"Not started","In Progress":"In progress","Done":"Done"};
   return(
-    <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:9,fontWeight:700,color:m.text,background:m.bg,border:`1px solid ${m.dot}22`,padding:"2px 8px",borderRadius:99,whiteSpace:"nowrap"}}>
-      <span style={{width:5,height:5,borderRadius:"50%",background:m.dot,flexShrink:0}}/>
-      {short[status]}
+    <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,fontWeight:700,color:m.text,background:m.bg,padding:"2px 9px",borderRadius:99,whiteSpace:"nowrap",border:`1px solid ${m.dot}33`}}>
+      <span style={{width:6,height:6,borderRadius:"50%",background:m.dot,flexShrink:0}}/>
+      {m.label}
     </span>
   );
 }
@@ -91,36 +107,27 @@ function Avatar({name}){
 }
 
 function CheckCircle({status,onClick}){
-  const done=status==="Done";
-  const inP=status==="In Progress";
+  const done=status==="Done",inP=status==="In Progress";
   const borderColor=done?"#16A34A":inP?ACCENT:"#CBD5E1";
-  const bg=done?"#16A34A":"transparent";
   return(
-    <div onClick={e=>{e.stopPropagation();onClick();}}
-      style={{width:20,height:20,borderRadius:"50%",border:`2px solid ${borderColor}`,background:bg,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,transition:"all 0.2s"}}>
-      {done&&<svg width="10" height="8" viewBox="0 0 10 8"><polyline points="1,4 3.5,6.5 9,1" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-      {inP&&<div style={{width:8,height:8,borderRadius:"50%",background:ACCENT}}/>}
+    <div onClick={e=>{e.stopPropagation();onClick();}} style={{width:22,height:22,borderRadius:"50%",border:`2px solid ${borderColor}`,background:done?"#16A34A":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,transition:"all 0.2s"}}>
+      {done&&<svg width="11" height="9" viewBox="0 0 11 9"><polyline points="1,4.5 4,7.5 10,1" stroke="white" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+      {inP&&<div style={{width:9,height:9,borderRadius:"50%",background:ACCENT}}/>}
     </div>
   );
 }
 
-function Modal({task,onClose,onSave,courses,onAddCourse}){
-  const blank={title:"",course:courses[0],type:"Assignment",due:"",priority:"Medium",status:"Not Started",notes:""};
+function Modal({task,onClose,onSave,groups,onAddGroup,typeList}){
+  const blank={title:"",course:groups[0],type:typeList[0],due:"",priority:"Medium",status:"Not Started",notes:""};
   const [form,setForm]=useState(task||blank);
-  const [newC,setNewC]=useState("");
+  const [newG,setNewG]=useState("");
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const lbl={fontSize:10,fontWeight:700,color:"#6366F1",marginBottom:5,textTransform:"uppercase",letterSpacing:"0.07em",display:"block"};
   const inp={width:"100%",boxSizing:"border-box",fontSize:13,borderRadius:10,border:"1.5px solid #C7D2FE",padding:"9px 12px",outline:"none",fontFamily:"inherit",color:"#1E293B",background:"#F8FAFF"};
-
-  useEffect(()=>{
-    const h=e=>{if(e.key==="Escape")onClose();};
-    window.addEventListener("keydown",h);
-    return()=>window.removeEventListener("keydown",h);
-  },[]);
-
+  useEffect(()=>{const h=e=>{if(e.key==="Escape")onClose();};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[]);
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(10,15,50,0.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:"1rem"}} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:"#fff",borderRadius:20,border:"1.5px solid #C7D2FE",padding:"1.75rem",width:460,maxWidth:"100%",boxSizing:"border-box",maxHeight:"90vh",overflowY:"auto"}}>
+      <div style={{background:"#fff",borderRadius:20,border:"1.5px solid #C7D2FE",padding:"1.75rem",width:480,maxWidth:"100%",boxSizing:"border-box",maxHeight:"90vh",overflowY:"auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
           <div>
             <div style={{fontWeight:700,fontSize:17,color:ROYAL}}>{task?.id?"Edit task":"Add new task"}</div>
@@ -129,9 +136,9 @@ function Modal({task,onClose,onSave,courses,onAddCourse}){
           <button onClick={onClose} style={{background:"#EEF0FF",border:"none",borderRadius:"50%",width:32,height:32,fontSize:18,color:ACCENT,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
-          <div><label style={lbl}>Task title</label><input placeholder="e.g. Chapter 5 lab report" value={form.title} onChange={e=>set("title",e.target.value)} style={inp}/></div>
+          <div><label style={lbl}>Title</label><input placeholder="e.g. Chapter 5 lab report" value={form.title} onChange={e=>set("title",e.target.value)} style={inp}/></div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            {[["course","Course",courses],["type","Type",TYPES],["priority","Priority",PRIORITIES],["status","Status",STATUSES]].map(([key,label,opts])=>(
+            {[["course","Group",groups],["type","Type",typeList],["priority","Priority",PRIORITIES],["status","Status",STATUSES]].map(([key,label,opts])=>(
               <div key={key}><label style={lbl}>{label}</label>
                 <select value={form[key]} onChange={e=>set(key,e.target.value)} style={{...inp,appearance:"none",cursor:"pointer"}}>
                   {opts.map(o=><option key={o}>{o}</option>)}
@@ -140,39 +147,37 @@ function Modal({task,onClose,onSave,courses,onAddCourse}){
             ))}
           </div>
           <div><label style={lbl}>Due date</label><input type="date" value={form.due} onChange={e=>set("due",e.target.value)} style={inp}/></div>
-          <div><label style={lbl}>Notes</label><textarea placeholder="Any additional notes..." value={form.notes} onChange={e=>set("notes",e.target.value)} rows={2} style={{...inp,resize:"vertical"}}/></div>
+          <div><label style={lbl}>Notes</label><textarea placeholder="Optional notes..." value={form.notes} onChange={e=>set("notes",e.target.value)} rows={2} style={{...inp,resize:"vertical"}}/></div>
           <div style={{display:"flex",gap:8}}>
-            <input value={newC} onChange={e=>setNewC(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&newC.trim()){onAddCourse(newC.trim());set("course",newC.trim());setNewC("");}}} placeholder="Add new course..." style={{...inp,flex:1,fontSize:12}}/>
-            <button onClick={()=>{if(newC.trim()){onAddCourse(newC.trim());set("course",newC.trim());setNewC("");}}} style={{padding:"9px 14px",fontSize:12,background:ACCENT_LIGHT,color:ACCENT,border:`1.5px solid ${ACCENT_MID}`,borderRadius:10,fontWeight:700,whiteSpace:"nowrap"}}>+ Add</button>
+            <input value={newG} onChange={e=>setNewG(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&newG.trim()){onAddGroup(newG.trim());set("course",newG.trim());setNewG("");}}} placeholder="Add new group..." style={{...inp,flex:1,fontSize:12}}/>
+            <button onClick={()=>{if(newG.trim()){onAddGroup(newG.trim());set("course",newG.trim());setNewG("");}}} style={{padding:"9px 14px",fontSize:12,background:ACCENT_LIGHT,color:ACCENT,border:`1.5px solid ${ACCENT_MID}`,borderRadius:10,fontWeight:700,whiteSpace:"nowrap"}}>+ Add</button>
           </div>
         </div>
         <div style={{display:"flex",gap:10,marginTop:22,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={{padding:"9px 18px",fontSize:13,background:"#F1F5F9",border:"1.5px solid #E2E8F0",borderRadius:10,color:"#64748B",fontWeight:600}}>Cancel</button>
-          <button onClick={()=>{if(form.title&&form.due)onSave(form);}} style={{padding:"9px 22px",fontSize:13,background:ACCENT,color:"#fff",border:"none",borderRadius:10,fontWeight:700}}>
-            {task?.id?"Save changes":"Add task"}
-          </button>
+          <button onClick={()=>{if(form.title&&form.due)onSave(form);}} style={{padding:"9px 22px",fontSize:13,background:ACCENT,color:"#fff",border:"none",borderRadius:10,fontWeight:700}}>{task?.id?"Save changes":"Add task"}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function App(){
-  const [tasks,setTasks]=useState(()=>load("hw_tasks",SAMPLE));
-  const [courses,setCourses]=useState(()=>load("hw_courses",DEFAULT_COURSES));
-  const [nextId,setNextId]=useState(()=>load("hw_nextid",500));
+function Tracker({storageKey,sampleData,defaultGroups,typeList,typeCMap,trackerName}){
+  const [tasks,setTasks]=useState(()=>load(storageKey+"_tasks",sampleData));
+  const [groups,setGroups]=useState(()=>load(storageKey+"_groups",defaultGroups));
+  const [nextId,setNextId]=useState(()=>load(storageKey+"_nid",900));
   const [modal,setModal]=useState(null);
   const [filterStatus,setFilterStatus]=useState("All");
-  const [filterCourse,setFilterCourse]=useState("All");
+  const [filterGroup,setFilterGroup]=useState("All");
   const [view,setView]=useState("list");
   const [expanded,setExpanded]=useState(null);
   const [sort,setSort]=useState("due");
 
-  useEffect(()=>save("hw_tasks",tasks),[tasks]);
-  useEffect(()=>save("hw_courses",courses),[courses]);
-  useEffect(()=>save("hw_nextid",nextId),[nextId]);
+  useEffect(()=>save(storageKey+"_tasks",tasks),[tasks]);
+  useEffect(()=>save(storageKey+"_groups",groups),[groups]);
+  useEffect(()=>save(storageKey+"_nid",nextId),[nextId]);
 
-  const allCourses=useMemo(()=>[...new Set([...courses,...tasks.map(t=>t.course)])],[courses,tasks]);
+  const allGroups=useMemo(()=>[...new Set([...groups,...tasks.map(t=>t.course)])],[groups,tasks]);
   const saveTask=f=>{
     if(f.id)setTasks(ts=>ts.map(t=>t.id===f.id?f:t));
     else{setTasks(ts=>[...ts,{...f,id:nextId}]);setNextId(n=>n+1);}
@@ -180,205 +185,258 @@ function App(){
   };
   const cycleStatus=id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,status:STATUSES[(STATUSES.indexOf(t.status)+1)%3]}:t));
   const deleteTask=id=>{if(window.confirm("Delete this task?"))setTasks(ts=>ts.filter(t=>t.id!==id));};
-  const addCourse=c=>{if(!allCourses.includes(c))setCourses(cs=>[...cs,c]);};
+  const addGroup=g=>{if(!allGroups.includes(g))setGroups(gs=>[...gs,g]);};
 
   const filtered=useMemo(()=>{
     let t=[...tasks];
     if(filterStatus!=="All")t=t.filter(x=>x.status===filterStatus);
-    if(filterCourse!=="All")t=t.filter(x=>x.course===filterCourse);
+    if(filterGroup!=="All")t=t.filter(x=>x.course===filterGroup);
     if(sort==="due")t.sort((a,b)=>new Date(a.due)-new Date(b.due));
     else if(sort==="priority")t.sort((a,b)=>PRIORITIES.indexOf(a.priority)-PRIORITIES.indexOf(b.priority));
     else t.sort((a,b)=>a.course.localeCompare(b.course));
     return t;
-  },[tasks,filterStatus,filterCourse,sort]);
+  },[tasks,filterStatus,filterGroup,sort]);
 
   const grouped=useMemo(()=>{const g={};filtered.forEach(t=>{if(!g[t.course])g[t.course]=[];g[t.course].push(t);});return g;},[filtered]);
-
   const stats=useMemo(()=>({
     total:tasks.length,
     done:tasks.filter(t=>t.status==="Done").length,
     inProg:tasks.filter(t=>t.status==="In Progress").length,
     overdue:tasks.filter(t=>t.status!=="Done"&&daysLeft(t.due)<0).length,
   }),[tasks]);
-
   const pct=stats.total?Math.round((stats.done/stats.total)*100):0;
-
   const sel={fontSize:11,padding:"5px 10px",borderRadius:8,border:"1.5px solid #C7D2FE",background:"#fff",color:"#3730A3",cursor:"pointer",outline:"none",fontFamily:"inherit",fontWeight:600};
 
-  const statCards=[
-    {label:"Total",value:stats.total,path:"M4 6h16M4 10h16M4 14h8",color:ROYAL,ic:ACCENT},
-    {label:"In progress",value:stats.inProg,path:"M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4",color:ACCENT,ic:ACCENT},
-    {label:"Done",value:`${pct}%`,path:"M20 6L9 17l-5-5",color:"#15803D",ic:"#16A34A"},
-    {label:"Overdue",value:stats.overdue,path:"M12 8v4l3 3M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z",color:stats.overdue>0?"#C0392B":"#94A3B8",ic:stats.overdue>0?"#E74C3C":"#CBD5E1"},
-  ];
-
   return(
-    <div style={{maxWidth:980,margin:"0 auto",padding:"1.5rem 1rem 3rem"}}>
-      {modal!==null&&<Modal task={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={saveTask} courses={allCourses} onAddCourse={addCourse}/>}
+    <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+      {modal!==null&&<Modal task={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={saveTask} groups={allGroups} onAddGroup={addGroup} typeList={typeList}/>}
 
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:28,gap:12,flexWrap:"wrap"}}>
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <div style={{width:44,height:44,borderRadius:13,background:`linear-gradient(135deg,${ACCENT},${ROYAL})`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>
-          </div>
+      <div style={{padding:"20px 28px 16px",borderBottom:"1.5px solid #E0E7FF",background:"#fff",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18,gap:12,flexWrap:"wrap"}}>
           <div>
-            <div style={{fontSize:20,fontWeight:800,color:ROYAL,letterSpacing:"-0.03em"}}>Coursework tracker</div>
+            <div style={{fontSize:20,fontWeight:800,color:ROYAL,letterSpacing:"-0.03em"}}>{trackerName}</div>
             <div style={{fontSize:11,color:"#6366F1",marginTop:1,fontWeight:500}}>Spring 2026 · GVSU</div>
           </div>
+          <button onClick={()=>setModal("new")} style={{display:"flex",alignItems:"center",gap:7,padding:"9px 20px",fontSize:13,fontWeight:700,background:`linear-gradient(135deg,${ACCENT},${ROYAL})`,color:"#fff",border:"none",borderRadius:12}}>
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><line x1="7" y1="1" x2="7" y2="13" stroke="white" strokeWidth="2.5" strokeLinecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
+            New task
+          </button>
         </div>
-        <button onClick={()=>setModal("new")} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 20px",fontSize:13,fontWeight:700,background:`linear-gradient(135deg,${ACCENT},${ROYAL})`,color:"#fff",border:"none",borderRadius:12,letterSpacing:"0.01em"}}>
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><line x1="7" y1="1" x2="7" y2="13" stroke="white" strokeWidth="2.5" strokeLinecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
-          New task
-        </button>
-      </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:12,marginBottom:20}}>
-        {statCards.map(s=>(
-          <div key={s.label} style={{background:"#fff",border:"1.5px solid #E0E7FF",borderRadius:14,padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:10,fontWeight:700,color:"#6366F1",textTransform:"uppercase",letterSpacing:"0.07em"}}>{s.label}</span>
-              <div style={{width:26,height:26,borderRadius:8,background:s.ic+"18",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={s.ic} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={s.path}/></svg>
-              </div>
-            </div>
-            <div style={{fontSize:28,fontWeight:800,color:s.color,letterSpacing:"-0.04em",lineHeight:1}}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{background:"#E0E7FF",borderRadius:99,height:5,marginBottom:24,overflow:"hidden"}}>
-        <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${ACCENT},#16A34A)`,borderRadius:99,transition:"width 0.5s ease"}}/>
-      </div>
-
-      <div style={{display:"flex",gap:7,marginBottom:18,flexWrap:"wrap",alignItems:"center"}}>
-        <div style={{display:"flex",background:"#E0E7FF",borderRadius:9,padding:3,gap:2}}>
-          {["list","board"].map(v=>(
-            <button key={v} onClick={()=>setView(v)} style={{padding:"5px 15px",fontSize:11,border:"none",borderRadius:7,background:view===v?"#fff":"transparent",color:view===v?ROYAL:"#818CF8",fontWeight:view===v?700:500,boxShadow:view===v?"0 1px 4px rgba(59,79,216,0.12)":"none",transition:"all 0.15s"}}>
-              {v==="list"?"List":"Board"}
-            </button>
-          ))}
-        </div>
-        <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={sel}>
-          <option value="All">All statuses</option>
-          {STATUSES.map(s=><option key={s}>{s}</option>)}
-        </select>
-        <select value={filterCourse} onChange={e=>setFilterCourse(e.target.value)} style={sel}>
-          <option value="All">All courses</option>
-          {allCourses.map(c=><option key={c}>{c}</option>)}
-        </select>
-        <select value={sort} onChange={e=>setSort(e.target.value)} style={sel}>
-          <option value="due">Due date</option>
-          <option value="priority">Priority</option>
-          <option value="course">Course</option>
-        </select>
-      </div>
-
-      {view==="list"&&(
-        <div style={{background:"#fff",border:"1.5px solid #E0E7FF",borderRadius:16,overflow:"hidden"}}>
-          {Object.keys(grouped).length===0&&(
-            <div style={{padding:"3rem",textAlign:"center",color:"#C7D2FE",fontSize:13}}>No tasks — add one above.</div>
-          )}
-          {Object.entries(grouped).map(([course,ctasks],gi)=>(
-            <div key={course}>
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 16px",background:"#F5F7FF",borderTop:gi>0?"1.5px solid #E0E7FF":"none",borderBottom:"1.5px solid #E0E7FF"}}>
-                <Avatar name={course}/>
-                <span style={{fontSize:12,fontWeight:700,color:ROYAL}}>{course}</span>
-                <span style={{fontSize:10,fontWeight:700,color:"#818CF8",background:"#fff",border:"1.5px solid #C7D2FE",borderRadius:99,padding:"1px 8px"}}>{ctasks.length}</span>
-              </div>
-              {ctasks.map((task,ti)=>{
-                const tc=TYPE_C[task.type]||TYPE_C.Other;
-                const pc=PRI[task.priority];
-                const exp=expanded===task.id;
-                const done=task.status==="Done";
-                return(
-                  <div key={task.id} style={{borderBottom:ti<ctasks.length-1?"1px solid #F5F7FF":"none"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 16px",cursor:"pointer",transition:"background 0.1s"}}
-                      onMouseEnter={e=>e.currentTarget.style.background="#F8F9FF"}
-                      onMouseLeave={e=>e.currentTarget.style.background=""}
-                      onClick={()=>setExpanded(exp?null:task.id)}>
-                      <CheckCircle status={task.status} onClick={()=>cycleStatus(task.id)}/>
-                      <span style={{flex:1,fontSize:13,fontWeight:500,color:done?"#CBD5E1":ROYAL,textDecoration:done?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.title}</span>
-                      <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
-                        <StatusPill status={task.status}/>
-                        <span style={{fontSize:9,fontWeight:700,background:tc.bg,color:tc.text,border:`1px solid ${tc.border}`,padding:"2px 7px",borderRadius:99}}>{task.type}</span>
-                        <span style={{fontSize:9,fontWeight:700,background:pc.bg,color:pc.text,border:`1px solid ${pc.border}`,padding:"2px 7px",borderRadius:99,display:"flex",alignItems:"center",gap:3}}>
-                          <span style={{width:5,height:5,borderRadius:"50%",background:pc.dot}}/>{task.priority}
-                        </span>
-                        {task.due&&<DuePill due={task.due}/>}
-                        <span style={{fontSize:10,color:"#94A3B8",minWidth:46,textAlign:"right",fontWeight:500}}>
-                          {task.due?new Date(task.due+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—"}
-                        </span>
-                      </div>
-                      <div style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
-                        <button onClick={()=>setModal(task)} style={{padding:"3px 9px",fontSize:10,fontWeight:700,background:"#EEF0FF",border:"1.5px solid #C7D2FE",borderRadius:7,color:ACCENT}}>Edit</button>
-                        <button onClick={()=>deleteTask(task.id)} style={{padding:"3px 8px",fontSize:10,fontWeight:700,background:"#FFF0F0",border:"1.5px solid #FACACA",borderRadius:7,color:"#C0392B"}}>✕</button>
-                      </div>
-                    </div>
-                    {exp&&(
-                      <div style={{padding:"0 16px 12px 46px",borderTop:"1px solid #F5F7FF"}}>
-                        {task.notes&&<div style={{fontSize:12,color:"#64748B",marginBottom:8,lineHeight:1.6}}>{task.notes}</div>}
-                        <StatusPill status={task.status}/>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {view==="board"&&(
-        <div style={{display:"flex",gap:12,alignItems:"flex-start",overflowX:"auto",paddingBottom:10}}>
-          {STATUSES.map(status=>{
-            const col=filtered.filter(t=>t.status===status);
-            const sm=STATUS_META[status];
-            return(
-              <div key={status} style={{flex:"0 0 265px",background:"#F5F7FF",borderRadius:16,border:"1.5px solid #E0E7FF",overflow:"hidden"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,padding:"12px 14px",borderBottom:"1.5px solid #E0E7FF"}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:sm.dot}}/>
-                  <span style={{fontSize:12,fontWeight:700,color:ROYAL}}>{status}</span>
-                  <span style={{marginLeft:"auto",fontSize:10,fontWeight:700,color:"#818CF8",background:"#fff",border:"1.5px solid #C7D2FE",borderRadius:99,padding:"1px 8px"}}>{col.length}</span>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10,marginBottom:14}}>
+          {[
+            {label:"Total",value:stats.total,path:"M4 6h16M4 10h16M4 14h8",color:ROYAL,ic:ACCENT},
+            {label:"In progress",value:stats.inProg,path:"M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4",color:ACCENT,ic:ACCENT},
+            {label:"Done",value:pct+"%",path:"M20 6L9 17l-5-5",color:"#15803D",ic:"#16A34A"},
+            {label:"Overdue",value:stats.overdue,path:"M12 8v4l3 3M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z",color:stats.overdue>0?"#C0392B":"#94A3B8",ic:stats.overdue>0?"#E74C3C":"#CBD5E1"},
+          ].map(s=>(
+            <div key={s.label} style={{background:"#F5F7FF",border:"1.5px solid #E0E7FF",borderRadius:12,padding:"12px 14px",display:"flex",flexDirection:"column",gap:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:10,fontWeight:700,color:"#6366F1",textTransform:"uppercase",letterSpacing:"0.06em"}}>{s.label}</span>
+                <div style={{width:24,height:24,borderRadius:7,background:s.ic+"18",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={s.ic} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d={s.path}/></svg>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",gap:9,padding:10}}>
-                  {col.length===0&&<div style={{fontSize:11,color:"#C7D2FE",textAlign:"center",padding:"1.5rem 0"}}>Nothing here</div>}
-                  {col.map(task=>{
-                    const tc=TYPE_C[task.type]||TYPE_C.Other;
-                    const pc=PRI[task.priority];
-                    return(
-                      <div key={task.id} style={{background:"#fff",border:"1.5px solid #E0E7FF",borderRadius:12,padding:"12px 13px",transition:"border-color 0.15s",cursor:"default"}}
-                        onMouseEnter={e=>e.currentTarget.style.borderColor=ACCENT_MID}
-                        onMouseLeave={e=>e.currentTarget.style.borderColor="#E0E7FF"}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6,marginBottom:7}}>
-                          <span style={{fontSize:13,fontWeight:600,color:ROYAL,lineHeight:1.4}}>{task.title}</span>
-                          <button onClick={()=>setModal(task)} style={{padding:"2px 7px",fontSize:11,background:"#EEF0FF",border:"1.5px solid #C7D2FE",borderRadius:7,color:ACCENT,flexShrink:0}}>···</button>
-                        </div>
-                        <div style={{fontSize:10,color:"#818CF8",marginBottom:9,fontWeight:600}}>{task.course}</div>
-                        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
-                          <span style={{fontSize:9,fontWeight:700,background:tc.bg,color:tc.text,border:`1px solid ${tc.border}`,padding:"2px 7px",borderRadius:99}}>{task.type}</span>
-                          <span style={{fontSize:9,fontWeight:700,background:pc.bg,color:pc.text,border:`1px solid ${pc.border}`,padding:"2px 7px",borderRadius:99}}>{task.priority}</span>
+              </div>
+              <div style={{fontSize:24,fontWeight:800,color:s.color,letterSpacing:"-0.03em",lineHeight:1}}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{background:"#E0E7FF",borderRadius:99,height:4,marginBottom:14,overflow:"hidden"}}>
+          <div style={{height:"100%",width:pct+"%",background:`linear-gradient(90deg,${ACCENT},#16A34A)`,borderRadius:99,transition:"width 0.5s ease"}}/>
+        </div>
+
+        <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center"}}>
+          <div style={{display:"flex",background:"#E0E7FF",borderRadius:9,padding:3,gap:2}}>
+            {["list","board"].map(v=>(
+              <button key={v} onClick={()=>setView(v)} style={{padding:"5px 16px",fontSize:11,border:"none",borderRadius:7,background:view===v?"#fff":"transparent",color:view===v?ROYAL:"#818CF8",fontWeight:view===v?700:500,boxShadow:view===v?"0 1px 4px rgba(59,79,216,0.12)":"none",transition:"all 0.15s"}}>
+                {v==="list"?"List":"Board"}
+              </button>
+            ))}
+          </div>
+          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} style={sel}>
+            <option value="All">All statuses</option>
+            {STATUSES.map(s=><option key={s}>{s}</option>)}
+          </select>
+          <select value={filterGroup} onChange={e=>setFilterGroup(e.target.value)} style={sel}>
+            <option value="All">All groups</option>
+            {allGroups.map(g=><option key={g}>{g}</option>)}
+          </select>
+          <select value={sort} onChange={e=>setSort(e.target.value)} style={sel}>
+            <option value="due">Due date</option>
+            <option value="priority">Priority</option>
+            <option value="course">Group</option>
+          </select>
+        </div>
+      </div>
+
+      <div style={{flex:1,overflowY:"auto",padding:"20px 28px"}}>
+        {view==="list"&&(
+          <div style={{background:"#fff",border:"1.5px solid #E0E7FF",borderRadius:16,overflow:"hidden"}}>
+            {Object.keys(grouped).length===0&&<div style={{padding:"3rem",textAlign:"center",color:"#C7D2FE",fontSize:13}}>No tasks — add one above.</div>}
+            {Object.entries(grouped).map(([grp,gtasks],gi)=>(
+              <div key={grp}>
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"9px 18px",background:"#F5F7FF",borderTop:gi>0?"1.5px solid #E0E7FF":"none",borderBottom:"1.5px solid #E0E7FF"}}>
+                  <Avatar name={grp}/>
+                  <span style={{fontSize:12,fontWeight:700,color:ROYAL}}>{grp}</span>
+                  <span style={{fontSize:10,fontWeight:700,color:"#818CF8",background:"#fff",border:"1.5px solid #C7D2FE",borderRadius:99,padding:"1px 8px"}}>{gtasks.length}</span>
+                </div>
+                {gtasks.map((task,ti)=>{
+                  const tc=(typeCMap[task.type]||typeCMap.Other);
+                  const pc=PRI[task.priority];
+                  const exp=expanded===task.id;
+                  const done=task.status==="Done";
+                  return(
+                    <div key={task.id} style={{borderBottom:ti<gtasks.length-1?"1px solid #F5F7FF":"none"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:12,padding:"13px 18px",cursor:"pointer",transition:"background 0.1s"}}
+                        onMouseEnter={e=>e.currentTarget.style.background="#F8F9FF"}
+                        onMouseLeave={e=>e.currentTarget.style.background=""}
+                        onClick={()=>setExpanded(exp?null:task.id)}>
+                        <CheckCircle status={task.status} onClick={()=>cycleStatus(task.id)}/>
+                        <span style={{flex:1,fontSize:14,fontWeight:500,color:done?"#CBD5E1":ROYAL,textDecoration:done?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.title}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                          <StatusPill status={task.status}/>
+                          <span style={{fontSize:10,fontWeight:700,background:tc.bg,color:tc.text,border:`1px solid ${tc.border}`,padding:"2px 8px",borderRadius:99}}>{task.type}</span>
+                          <span style={{fontSize:10,fontWeight:700,background:pc.bg,color:pc.text,border:`1px solid ${pc.border}`,padding:"2px 8px",borderRadius:99,display:"flex",alignItems:"center",gap:3}}>
+                            <span style={{width:5,height:5,borderRadius:"50%",background:pc.dot}}/>{task.priority}
+                          </span>
                           {task.due&&<DuePill due={task.due}/>}
+                          <span style={{fontSize:11,color:"#94A3B8",minWidth:50,textAlign:"right",fontWeight:500}}>{task.due?new Date(task.due+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—"}</span>
                         </div>
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                          {task.due&&<span style={{fontSize:10,color:"#94A3B8",fontWeight:500}}>{new Date(task.due+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
+                        <div style={{display:"flex",gap:5}} onClick={e=>e.stopPropagation()}>
+                          <button onClick={()=>setModal(task)} style={{padding:"4px 10px",fontSize:11,fontWeight:700,background:"#EEF0FF",border:"1.5px solid #C7D2FE",borderRadius:7,color:ACCENT}}>Edit</button>
+                          <button onClick={()=>deleteTask(task.id)} style={{padding:"4px 9px",fontSize:11,fontWeight:700,background:"#FFF0F0",border:"1.5px solid #FACACA",borderRadius:7,color:"#C0392B"}}>✕</button>
+                        </div>
+                      </div>
+                      {exp&&(
+                        <div style={{padding:"0 18px 13px 52px",borderTop:"1px solid #F5F7FF"}}>
+                          {task.notes&&<div style={{fontSize:12,color:"#64748B",marginBottom:8,lineHeight:1.6}}>{task.notes}</div>}
                           <StatusPill status={task.status}/>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+            ))}
+          </div>
+        )}
+
+        {view==="board"&&(
+          <div style={{display:"flex",gap:14,alignItems:"flex-start",overflowX:"auto",paddingBottom:12}}>
+            {STATUSES.map(status=>{
+              const col=filtered.filter(t=>t.status===status);
+              const sm=STATUS_META[status];
+              return(
+                <div key={status} style={{flex:"0 0 300px",background:"#F5F7FF",borderRadius:16,border:"1.5px solid #E0E7FF",overflow:"hidden"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"14px 16px",borderBottom:"1.5px solid #E0E7FF"}}>
+                    <div style={{width:9,height:9,borderRadius:"50%",background:sm.dot}}/>
+                    <span style={{fontSize:13,fontWeight:700,color:ROYAL}}>{status}</span>
+                    <span style={{marginLeft:"auto",fontSize:10,fontWeight:700,color:"#818CF8",background:"#fff",border:"1.5px solid #C7D2FE",borderRadius:99,padding:"1px 8px"}}>{col.length}</span>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:10,padding:12}}>
+                    {col.length===0&&<div style={{fontSize:12,color:"#C7D2FE",textAlign:"center",padding:"2rem 0"}}>Nothing here</div>}
+                    {col.map(task=>{
+                      const tc=(typeCMap[task.type]||typeCMap.Other);
+                      const pc=PRI[task.priority];
+                      return(
+                        <div key={task.id} style={{background:"#fff",border:"1.5px solid #E0E7FF",borderRadius:12,padding:"14px 15px",transition:"border-color 0.15s"}}
+                          onMouseEnter={e=>e.currentTarget.style.borderColor=ACCENT_MID}
+                          onMouseLeave={e=>e.currentTarget.style.borderColor="#E0E7FF"}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6,marginBottom:8}}>
+                            <span style={{fontSize:14,fontWeight:600,color:ROYAL,lineHeight:1.4}}>{task.title}</span>
+                            <button onClick={()=>setModal(task)} style={{padding:"2px 8px",fontSize:12,background:"#EEF0FF",border:"1.5px solid #C7D2FE",borderRadius:7,color:ACCENT,flexShrink:0}}>···</button>
+                          </div>
+                          <div style={{fontSize:11,color:"#818CF8",marginBottom:10,fontWeight:600}}>{task.course}</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
+                            <span style={{fontSize:10,fontWeight:700,background:tc.bg,color:tc.text,border:`1px solid ${tc.border}`,padding:"2px 8px",borderRadius:99}}>{task.type}</span>
+                            <span style={{fontSize:10,fontWeight:700,background:pc.bg,color:pc.text,border:`1px solid ${pc.border}`,padding:"2px 8px",borderRadius:99}}>{task.priority}</span>
+                            {task.due&&<DuePill due={task.due}/>}
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:8,borderTop:"1px solid #F0F4FF"}}>
+                            <span style={{fontSize:11,color:"#94A3B8",fontWeight:500}}>{task.due?new Date(task.due+"T00:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}):"No due date"}</span>
+                            <StatusPill status={task.status}/>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{marginTop:16,fontSize:10,color:"#A5B4FC",display:"flex",gap:12,fontWeight:500}}>
+          <span>Tasks save automatically</span><span>·</span>
+          <span>Click circle to cycle status</span><span>·</span>
+          <span>Click row to expand</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const TRACKERS=[
+  {id:"homework",label:"Homework",icon:"M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",storageKey:"hw",sampleData:HW_SAMPLE,defaultGroups:DEFAULT_HW_COURSES,typeList:TYPES,typeCMap:HW_TYPE_C,name:"Homework tracker"},
+  {id:"personal",label:"Personal",icon:"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",storageKey:"personal",sampleData:P_SAMPLE,defaultGroups:DEFAULT_PERSONAL_CATS,typeList:PERSONAL_TYPES,typeCMap:P_TYPE_C,name:"Personal tracker"},
+];
+
+export default function App(){
+  const [activeId,setActiveId]=useState("homework");
+  const active=TRACKERS.find(t=>t.id===activeId);
+
+  return(
+    <div style={{display:"flex",height:"100vh",overflow:"hidden"}}>
+      <div style={{width:220,background:`linear-gradient(180deg,${ROYAL} 0%,#1e2d6b 100%)`,display:"flex",flexDirection:"column",flexShrink:0,padding:"0 0 20px"}}>
+        <div style={{padding:"22px 20px 18px",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>
+            </div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:"#fff",letterSpacing:"-0.01em"}}>My Tracker</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",marginTop:1}}>Spring 2026</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{padding:"16px 12px 8px"}}>
+          <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8,paddingLeft:8}}>Trackers</div>
+          {TRACKERS.map(t=>{
+            const isActive=t.id===activeId;
+            return(
+              <button key={t.id} onClick={()=>setActiveId(t.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,border:"none",background:isActive?"rgba(255,255,255,0.15)":"transparent",color:isActive?"#fff":"rgba(255,255,255,0.6)",fontWeight:isActive?700:500,fontSize:13,marginBottom:2,textAlign:"left",transition:"all 0.15s"}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={t.icon}/></svg>
+                {t.label}
+                {isActive&&<div style={{marginLeft:"auto",width:6,height:6,borderRadius:"50%",background:"#A5B4FC"}}/>}
+              </button>
             );
           })}
         </div>
-      )}
 
-      <div style={{marginTop:18,fontSize:10,color:"#A5B4FC",display:"flex",gap:14,fontWeight:500}}>
-        <span>Tasks save automatically</span>
-        <span>·</span>
-        <span>Click circle to cycle status</span>
-        <span>·</span>
-        <span>Click row to expand</span>
+        <div style={{marginTop:"auto",padding:"0 12px"}}>
+          <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.35)",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8,paddingLeft:8}}>Quick stats</div>
+          <div style={{background:"rgba(255,255,255,0.08)",borderRadius:12,padding:"12px 14px"}}>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",marginBottom:6}}>Overall progress</div>
+            <div style={{background:"rgba(255,255,255,0.15)",borderRadius:99,height:4,overflow:"hidden",marginBottom:8}}>
+              <div style={{height:"100%",background:"#A5B4FC",borderRadius:99,width:"40%"}}/>
+            </div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",fontWeight:600}}>Spring 2026 · GVSU</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <Tracker
+          key={active.id}
+          storageKey={active.storageKey}
+          sampleData={active.sampleData}
+          defaultGroups={active.defaultGroups}
+          typeList={active.typeList}
+          typeCMap={active.typeCMap}
+          trackerName={active.name}
+        />
       </div>
     </div>
   );
